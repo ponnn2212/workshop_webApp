@@ -24,6 +24,8 @@ body {
     background-color: var(--light-bg);
     color: var(--text-color);
     line-height: 1.6;
+    /* เพิ่ม overflow-x: hidden เพื่อป้องกันการเกิด scrollbar แนวนอนจากองค์ประกอบที่ล้น */
+    overflow-x: hidden;
 }
 
 .container {
@@ -36,6 +38,8 @@ body {
     max-width: 550px;
     margin: 20px;
     animation: fadeIn 0.5s ease-out;
+    /* เพิ่ม flex-shrink: 0 เพื่อให้ container ไม่โดนบีบ */
+    flex-shrink: 0;
 }
 
 @keyframes fadeIn {
@@ -66,6 +70,11 @@ p {
 
 .button-group, .button-group-actions {
     margin-top: 30px;
+    /* เปลี่ยนจาก block ไปเป็น flex เพื่อควบคุมการจัดวางง่ายขึ้น */
+    display: flex;
+    flex-wrap: wrap; /* ให้ปุ่มลงบรรทัดใหม่ได้ถ้าพื้นที่ไม่พอ */
+    justify-content: center; /* จัดกลางปุ่ม */
+    gap: 10px; /* เพิ่มช่องว่างระหว่างปุ่ม */
 }
 
 .button-group button,
@@ -75,13 +84,16 @@ p {
     color: var(--white);
     border: none;
     padding: 12px 28px;
-    margin: 8px;
+    /* เปลี่ยน margin: 8px; เป็นการจัดการด้วย gap */
+    /* margin: 8px; */
     border-radius: 8px;
     cursor: pointer;
     font-size: 1.1em;
     font-weight: 500;
     transition: background-color 0.3s ease, transform 0.2s ease;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    /* เพิ่ม min-width เพื่อให้ปุ่มไม่เล็กเกินไปบนมือถือ */
+    min-width: 120px;
 }
 
 .button-group button:hover,
@@ -127,13 +139,15 @@ button:disabled {
 }
 
 .input-group input[type="text"] {
-    width: calc(100% - 24px);
+    width: calc(100% - 24px); /* แก้จาก 100% เป็น calc(100% - 24px) เพื่อให้รวม padding แล้วไม่เกิน */
     padding: 12px;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     font-size: 1em;
     background-color: var(--light-bg);
     transition: border-color 0.3s ease;
+    /* เพิ่ม box-sizing เพื่อให้ padding ไม่ดันความกว้างเกิน */
+    box-sizing: border-box;
 }
 
 .input-group input[type="text"]:focus {
@@ -172,6 +186,8 @@ button:disabled {
     padding: 12px 15px;
     border-radius: 8px;
     display: flex;
+    /* เปลี่ยนเป็น flex-wrap: wrap เพื่อให้ข้อความยาวๆ ไม่ล้น */
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -185,6 +201,9 @@ button:disabled {
     font-weight: 600;
     color: var(--text-color);
     font-size: 1.05em;
+    /* เพิ่ม flex-basis เพื่อให้กินพื้นที่ได้ดีขึ้น */
+    flex-basis: 60%; /* ให้ชื่อผู้เล่นกินพื้นที่ 60% */
+    text-align: left;
 }
 
 .player-list .player-name.first-buzzer {
@@ -197,6 +216,9 @@ button:disabled {
     padding: 4px 8px;
     border-radius: 5px;
     font-weight: 500;
+    /* เพิ่ม flex-basis เพื่อให้ status กินพื้นที่ได้ดีขึ้น */
+    flex-basis: 35%; /* ให้ status กินพื้นที่ 35% */
+    text-align: right;
 }
 
 .player-list .status.foul {
@@ -315,7 +337,93 @@ button:disabled {
 }
 
 /* Responsive adjustments */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+    h1 {
+        font-size: 1.8em;
+    }
+    h2 {
+        font-size: 1.5em;
+    }
     .container {
-        padding: 20px 25px;
-        
+        padding: 25px 30px;
+        margin: 15px;
+        width: 95%; /* ใช้พื้นที่มากขึ้นบนหน้าจอเล็ก */
+    }
+    .button-group button,
+    .action-button,
+    .primary-button {
+        padding: 10px 20px;
+        font-size: 1em;
+        min-width: unset; /* ให้ปรับขนาดได้ตามเนื้อหา */
+        flex-grow: 1; /* ให้ขยายเต็มพื้นที่ที่มี */
+    }
+    .button-group, .button-group-actions {
+        gap: 8px; /* ลดช่องว่าง */
+    }
+    .input-group input[type="text"] {
+        padding: 10px;
+        font-size: 0.95em;
+    }
+    .room-code-display, .room-code-info {
+        font-size: 1.1em;
+    }
+    .room-name-info {
+        font-size: 1em;
+    }
+    .player-list li {
+        padding: 10px 12px;
+        flex-direction: column; /* เรียงจากบนลงล่างบนมือถือ */
+        align-items: flex-start; /* จัดชิดซ้าย */
+    }
+    .player-list .player-name, .player-list .status {
+        flex-basis: 100%; /* กินพื้นที่เต็ม */
+        text-align: left; /* จัดชิดซ้าย */
+        margin-bottom: 5px; /* เพิ่มช่องว่าง */
+    }
+    .player-list .status {
+        margin-top: 5px;
+    }
+    .game-title {
+        font-size: 2em;
+    }
+    .buzz-button {
+        width: 150px;
+        height: 150px;
+        font-size: 1.8em;
+        margin: 30px auto;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.6em;
+    }
+    h2 {
+        font-size: 1.3em;
+    }
+    .container {
+        padding: 20px 20px;
+        margin: 10px;
+    }
+    .button-group button,
+    .action-button,
+    .primary-button {
+        padding: 8px 15px;
+        font-size: 0.9em;
+    }
+    .buzz-button {
+        width: 120px;
+        height: 120px;
+        font-size: 1.5em;
+        margin: 20px auto;
+    }
+    .player-info, .game-status, .error-message, .game-message {
+        font-size: 0.9em;
+    }
+    .player-list .player-name {
+        font-size: 1em;
+    }
+    .player-list .status {
+        font-size: 0.85em;
+    }
+}

@@ -38,9 +38,11 @@
         </div>
     </div>
 
+    <!-- โหลด script.js ก่อน script ส่วนนี้ -->
+    <script src="script.js"></script> 
     <script>
         let currentRoomCode;
-        let updateInterval; // เก็บ reference ของ setInterval เพื่อเคลียร์ได้
+        let updateInterval;
 
         document.addEventListener('DOMContentLoaded', () => {
             // ล้างข้อมูลห้องเก่าทั้งหมดเมื่อเข้าสู่หน้านี้
@@ -52,13 +54,6 @@
             document.getElementById('roomCodeDisplay').textContent = currentRoomCode;
         });
 
-        // Function เพื่อตรวจสอบอักขระพิเศษ
-        function isValidName(name) {
-            // อนุญาตตัวอักษรไทย, อังกฤษ (ทั้งเล็กและใหญ่), ตัวเลข, และเว้นวรรค
-            const regex = /^[ก-๙a-zA-Z0-9\s]+$/;
-            return regex.test(name);
-        }
-
         function generateRoomCode() {
             return Math.floor(1000 + Math.random() * 9000); // 4 หลัก
         }
@@ -69,11 +64,11 @@
             const roomNameError = document.getElementById('roomNameError');
 
             if (!roomName) {
-                roomNameError.textContent = 'กรุณาใส่ชื่อห้อง';
+                roomNameError.textContent = 'Invalid: กรุณาใส่ชื่อห้อง';
                 return;
             }
-            if (!isValidName(roomName)) {
-                roomNameError.textContent = 'ชื่อห้องห้ามมีอักขระพิเศษ (อนุญาตเฉพาะตัวอักษรไทย, อังกฤษ, ตัวเลข, เว้นวรรค)';
+            if (!isValidName(roomName)) { // ใช้ isValidName จาก script.js
+                roomNameError.textContent = 'Invalid: ชื่อห้องห้ามมีอักขระพิเศษ (อนุญาตเฉพาะตัวอักษรไทย, อังกฤษ, ตัวเลข)';
                 return;
             }
             roomNameError.textContent = ''; // เคลียร์ error ถ้ามี
@@ -108,8 +103,6 @@
 
             if (!roomData) {
                 gameStatusElem.textContent = 'ไม่พบข้อมูลห้อง';
-                // อาจจะ redirect กลับหน้าสร้างห้องถ้าไม่มีข้อมูล
-                // window.location.href = 'create_room.html';
                 return;
             }
 

@@ -21,15 +21,10 @@
         <p id="joinStatus" class="error-message"></p>
     </div>
 
+    <!-- โหลด script.js ก่อน script ส่วนนี้ -->
+    <script src="script.js"></script>
     <script>
-        // Function เพื่อตรวจสอบอักขระพิเศษ
-        function isValidName(name) {
-            const regex = /^[ก-๙a-zA-Z0-9\s]+$/;
-            return regex.test(name);
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
-            // ดึงข้อมูลผู้เล่นที่เคยเข้าร่วมไว้ (ถ้ามี)
             const savedPlayerName = localStorage.getItem('currentPlayerName');
             const savedRoomCode = localStorage.getItem('currentPlayerRoomCode');
             if (savedPlayerName) {
@@ -47,15 +42,15 @@
             const joinStatusElem = document.getElementById('joinStatus');
 
             if (!roomCode || roomCode.length !== 4) {
-                joinStatusElem.textContent = 'กรุณาใส่รหัสห้อง 4 ตัว';
+                joinStatusElem.textContent = 'Invalid: กรุณาใส่รหัสห้อง 4 ตัว';
                 return;
             }
             if (!playerName) {
-                joinStatusElem.textContent = 'กรุณาใส่ชื่อของคุณ';
+                joinStatusElem.textContent = 'Invalid: กรุณาใส่ชื่อของคุณ';
                 return;
             }
-            if (!isValidName(playerName)) {
-                joinStatusElem.textContent = 'ชื่อของคุณห้ามมีอักขระพิเศษ (อนุญาตเฉพาะตัวอักษรไทย, อังกฤษ, ตัวเลข, เว้นวรรค)';
+            if (!isValidName(playerName)) { // ใช้ isValidName จาก script.js
+                joinStatusElem.textContent = 'Invalid: ชื่อของคุณห้ามมีอักขระพิเศษ (อนุญาตเฉพาะตัวอักษรไทย, อังกฤษ, ตัวเลข)';
                 return;
             }
             joinStatusElem.textContent = ''; // เคลียร์ error ถ้ามี
@@ -63,14 +58,17 @@
             let roomData = JSON.parse(localStorage.getItem('gameRoom'));
 
             if (roomData && roomData.code == roomCode) {
-                // ตรวจสอบชื่อซ้ำ (ไม่รวมตัวเองหากเคยเข้ามาแล้ว)
+                // ตรวจสอบชื่อซ้ำ (กรณีผู้เล่นคนอื่น)
                 const existingPlayerNames = Object.keys(roomData.players).map(name => name.toLowerCase());
                 if (existingPlayerNames.includes(playerName.toLowerCase()) && roomData.players[playerName] === undefined) {
-                    joinStatusElem.textContent = 'ชื่อนี้มีคนใช้แล้วในห้องนี้ กรุณาใช้ชื่ออื่น';
+                    joinStatusElem.textContent = 'Invalid: ชื่อนี้มีคนใช้แล้วในห้องนี้ กรุณาใช้ชื่ออื่น';
                     return;
                 }
+                
+                // หากผู้เล่นเคยเข้ามาด้วยชื่อนี้แล้ว (และไม่ได้เปลี่ยนชื่อ) ก็ถือว่าไม่ซ้ำ
+                // แต่หากเปลี่ยนชื่อมาเป็นชื่อที่ซ้ำกับคนอื่น (ซึ่งก่อนหน้านี้เคยใช้ชื่ออื่น) ก็ยังถือว่าซ้ำ
 
-                // เพิ่มผู้เล่นเข้ารายการ (ถ้ายังไม่มี)
+                // เพิ่มผู้เล่นเข้ารายการ (ถ้ายังไม่มีชื่อนี้)
                 if (!roomData.players[playerName]) {
                     roomData.players[playerName] = {
                         name: playerName,
@@ -80,8 +78,8 @@
                     };
                     localStorage.setItem('gameRoom', JSON.stringify(roomData));
                 } else {
-                     // หากผู้เล่นเคยมีสถานะ Foul แล้ว และห้องยังไม่เริ่มเกม ให้เคลียร์สถานะ Foul นั้น
-                    // เพื่อให้ผู้เล่นสามารถกดใหม่ได้ในรอบก่อนเริ่มเกม (แต่ก็จะ Foul อีกถ้ากดก่อนเริ่ม)
+                     // หากผู้เล่นคนเดิมเข้ามาอีกครั้ง
+                     // ถ้าเกมยังไม่เริ่มและผู้เล่นคนนี้เคย Foul มาก่อน ก็รีเซ็ต Foul ให้
                     if (!roomData.gameStarted && roomData.players[playerName].isFoul) {
                         roomData.players[playerName].isFoul = false;
                         roomData.players[playerName].buzzedTime = null;
@@ -95,7 +93,7 @@
 
                 window.location.href = 'game.html';
             } else {
-                joinStatusElem.textContent = 'ไม่พบห้องหรือรหัสห้องไม่ถูกต้อง';
+                joinStatusElem.textContent = 'Invalid: ไม่พบห้องหรือรหัสห้องไม่ถูกต้อง';
             }
         }
     </script>

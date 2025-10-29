@@ -14,13 +14,15 @@
         <p id="message" class="game-message"></p>
     </div>
 
+    <!-- โหลด script.js ก่อน script ส่วนนี้ -->
+    <script src="script.js"></script>
     <script>
         const playerName = localStorage.getItem('currentPlayerName');
         const roomCode = localStorage.getItem('currentPlayerRoomCode');
 
         document.addEventListener('DOMContentLoaded', () => {
             if (!playerName || !roomCode) {
-                document.getElementById('gameTitle').textContent = 'กรุณาเข้าร่วมห้องก่อน';
+                document.getElementById('gameTitle').textContent = 'Invalid: กรุณาเข้าร่วมห้องก่อน';
                 document.getElementById('buzzButton').style.display = 'none';
                 return;
             }
@@ -39,7 +41,6 @@
             if (buttonState === 'wait') {
                 buzzButton.classList.add('wait');
                 buzzButton.textContent = 'WAIT';
-                // ปุ่มจะเปิดใช้งานได้เสมอเพื่อรับการ Foul ก่อนเริ่มเกม
             } else if (buttonState === 'buzz') {
                 buzzButton.classList.add('buzz');
                 buzzButton.textContent = 'BUZZ';
@@ -61,7 +62,7 @@
             const messageElem = document.getElementById('message');
 
             if (!roomData || roomData.code != roomCode || !roomData.players[playerName]) {
-                gameTitleElem.textContent = 'ห้องไม่พร้อมใช้งาน';
+                gameTitleElem.textContent = 'Invalid: ห้องไม่พร้อมใช้งาน หรือคุณไม่ได้เข้าร่วมห้อง';
                 buzzButton.style.display = 'none';
                 messageElem.textContent = 'กลับไปที่หน้าเข้าร่วมห้องเพื่อลองอีกครั้ง';
                 return;

@@ -1,0 +1,62 @@
+<!-- ... ส่วน HTML ก่อนหน้า ... -->
+
+    <!-- โหลด script.js ก่อน script ส่วนนี้ -->
+    <script src="/socket.io/socket.io.js"></script> <!-- เพิ่มบรรทัดนี้ -->
+    <script src="script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedPlayerName = localStorage.getItem('currentPlayerName');
+            const savedRoomCode = localStorage.getItem('currentPlayerRoomCode');
+            if (savedPlayerName) {
+                document.getElementById('playerName').value = savedPlayerName;
+            }
+            if (savedRoomCode) {
+                document.getElementById('roomCode').value = savedRoomCode;
+            }
+        });
+
+        async function joinRoom() {
+            const roomCode = document.getElementById('roomCode').value.trim();
+            const playerNameInput = document.getElementById('playerName');
+            const playerName = playerNameInput.value.trim();
+            const joinStatusElem = document.getElementById('joinStatus');
+
+            if (!roomCode || roomCode.length !== 4) {
+                joinStatusElem.textContent = 'Invalid: กรุณาใส่รหัสห้อง 4 ตัว';
+                return;
+            }
+            if (!playerName) {
+                joinStatusElem.textContent = 'Invalid: กรุณาใส่ชื่อของคุณ';
+                return;
+            }
+            if (!isValidName(playerName)) {
+                joinStatusElem.textContent = 'Invalid: ชื่อของคุณห้ามมีอักขระพิเศษ (อนุญาตเฉพาะตัวอักษรไทย, อังกฤษ, ตัวเลข)';
+                return;
+            }
+            joinStatusElem.textContent = ''; // Clear error if any
+
+            try {
+                // Call API to join room on server
+                const response = await fetch('/api/join_room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomCode: roomCode, playerName: playerName })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('currentPlayerName', playerName);
+                    localStorage.setItem('currentPlayerRoomCode', roomCode);
+                    localStorage.removeItem('isCreator'); // Ensure this client is not marked as creator
+                    window.location.href = 'game.html'; // Redirect to game page
+                } else {
+                    joinStatusElem.textContent = data.message || 'ไม่พบห้องหรือรหัสห้องไม่ถูกต้อง';
+                }
+            } catch (error) {
+                console.error('Error joining room:', error);
+                joinStatusElem.textContent = 'Network error or server unavailable.';
+            }
+        }
+    </script>
+</body>
+</html>

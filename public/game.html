@@ -1,0 +1,111 @@
+<!-- ... ส่วน HTML ก่อนหน้า ... -->
+
+    <!-- โหลด script.js ก่อน script ส่วนนี้ -->
+    <script src="/socket.io/socket.io.js"></script> <!-- เพิ่มบรรทัดนี้ -->
+    <script src="script.js"></script>
+    <script>
+        const socket = io(); // Connects to the server
+        const playerName = localStorage.getItem('currentPlayerName');
+        const roomCode = localStorage.getItem('currentPlayerRoomCode');
+        const isCreator = localStorage.getItem('isCreator') === 'true'; // Check if this client is the creator
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!playerName || !roomCode) {
+                document.getElementById('gameTitle').textContent = 'Invalid: กรุณาเข้าร่วมห้องก่อน';
+                document.getElementById('buzzButton').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('displayPlayerName').textContent = playerName;
+            document.getElementById('displayRoomCode').textContent = roomCode;
+
+            // Join Socket.IO room immediately
+            socket.emit('joinRoomSocket', { roomCode: roomCode, playerName: playerName });
+        });
+
+        // Listen for room status updates from the server
+        socket.on('roomStatusUpdate', (roomData) => {
+            if (roomData.code === roomCode) { // Ensure update is for current room
+                checkGameStatus(roomData); // Update game status using data from server
+            }
+        });
+
+        socket.on('error', (message) => {
+            console.error('Socket error:', message);
+            document.getElementById('gameTitle').textContent = `เกิดข้อผิดพลาด: ${message}`;
+            document.getElementById('buzzButton').style.display = 'none';
+        });
+
+        function updateButtonState(buttonState) {
+            const buzzButton = document.getElementById('buzzButton');
+            buzzButton.classList.remove('wait', 'buzz', 'done', 'foul');
+            buzzButton.disabled = false;
+
+            if (buttonState === 'wait') {
+                buzzButton.classList.add('wait');
+                buzzButton.textContent = 'WAIT';
+            } else if (buttonState === 'buzz') {
+                buzzButton.classList.add('buzz');
+                buzzButton.textContent = 'BUZZ';
+            } else if (buttonState === 'done') {
+                buzzButton.classList.add('done');
+                buzzButton.textContent = 'DONE';
+                buzzButton.disabled = true;
+            } else if (buttonState === 'foul') {
+                buzzButton.classList.add('foul');
+                buzzButton.textContent = 'FOUL!';
+                buzzButton.disabled = true;
+            }
+        }
+
+        function checkGameStatus(roomData) { // Now accepts roomData as argument
+            const buzzButton = document.getElementById('buzzButton');
+            const gameTitleElem = document.getElementById('gameTitle');
+            const messageElem = document.getElementById('message');
+
+            if (!roomData || roomData.code != roomCode || !roomData.players[playerName]) {
+                gameTitleElem.textContent = 'Invalid: ห้องไม่พร้อมใช้งาน หรือคุณไม่ได้เข้าร่วมห้อง';
+                buzzButton.style.display = 'none';
+                messageElem.textContent = 'กลับไปที่หน้าเข้าร่วมห้องเพื่อลองอีกครั้ง';
+                return;
+            }
+
+            const currentPlayerInRoom = roomData.players[playerName];
+
+            if (currentPlayerInRoom.isFoul) {
+                updateButtonState('foul');
+                gameTitleElem.textContent = 'คุณกดก่อนเกมเริ่ม!';
+                messageElem.textContent = 'รอรอบใหม่นะ!';
+            } else if (roomData.gameStarted) {
+                if (currentPlayerInRoom.buzzedTime) {
+                    updateButtonState('done');
+                    if (roomData.firstBuzzer === playerName) {
+                        gameTitleElem.textContent = 'คุณกดเป็นคนแรก!';
+                    } else if (roomData.firstBuzzer) {
+                        gameTitleElem.textContent = `ผู้กดคนแรก: ${roomData.firstBuzzer}`;
+                        messageElem.textContent = 'มีคนกดไปก่อนคุณแล้ว!';
+                    } else {
+                        gameTitleElem.textContent = 'คุณกดแล้ว!';
+                        messageElem.textContent = '';
+                    }
+                } else {
+                    updateButtonState('buzz');
+                    gameTitleElem.textContent = 'เกมเริ่มแล้ว! กด BUZZ!';
+                    messageElem.textContent = '';
+                }
+            } else {
+                updateButtonState('wait');
+                gameTitleElem.textContent = 'รอกดปุ่ม...';
+                messageElem.textContent = '';
+            }
+        }
+
+        function buzz() {
+            // Emit buzz event to server
+            socket.emit('buzz', { roomCode: roomCode, playerName: playerName });
+            console.log(`${playerName} sent buzz request.`);
+            // UI will be updated by 'roomStatusUpdate' event from server
+        }
+    </script>
+</body>
+</html>

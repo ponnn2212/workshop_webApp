@@ -1,0 +1,171 @@
+<!-- ... ส่วน HTML ก่อนหน้า ... -->
+
+    <!-- โหลด script.js ก่อน script ส่วนนี้ -->
+    <script src="/socket.io/socket.io.js"></script> <!-- เพิ่มบรรทัดนี้ -->
+    <script src="script.js"></script> 
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io(); // Connects to the server where this page is served from
+
+        let currentRoomCode;
+        // let updateInterval; // No longer needed as updates come via socket
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // No need to clear old room data on create_room page load
+            // The server manages the room data
+            
+            // Generate a temporary room code for display, actual will come from server
+            document.getElementById('roomCodeDisplay').textContent = 'Generating...'; 
+        });
+
+        // No longer need generateRoomCode() client-side
+
+        async function saveRoomDetails() {
+            const roomNameInput = document.getElementById('roomName');
+            const roomName = roomNameInput.value.trim();
+            const roomNameError = document.getElementById('roomNameError');
+
+            if (!roomName) {
+                roomNameError.textContent = 'Invalid: กรุณาใส่ชื่อห้อง';
+                return;
+            }
+            if (!isValidName(roomName)) {
+                roomNameError.textContent = 'Invalid: ชื่อห้องห้ามมีอักขระพิเศษ (อนุญาตเฉพาะตัวอักษรไทย, อังกฤษ, ตัวเลข)';
+                return;
+            }
+            roomNameError.textContent = ''; // Clear error if any
+
+            try {
+                // 1. Call API to create room on server
+                const response = await fetch('/api/create_room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomName: roomName })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentRoomCode = data.roomCode;
+                    // Save room code and player name to localStorage for this client
+                    localStorage.setItem('currentPlayerRoomCode', currentRoomCode);
+                    localStorage.setItem('currentPlayerName', 'Creator'); // Assume creator's name is 'Creator' for simplicity, or add an input field
+                    localStorage.setItem('isCreator', 'true'); // Flag this client as the creator
+
+                    document.getElementById('displayRoomCode').textContent = currentRoomCode;
+                    document.getElementById('displayRoomName').textContent = roomName;
+                    document.getElementById('setupSection').style.display = 'none';
+                    document.getElementById('roomDetails').style.display = 'block';
+
+                    // 2. Join Socket.IO room
+                    socket.emit('joinRoomSocket', { roomCode: currentRoomCode, playerName: 'Creator' }); // Join socket room
+
+                } else {
+                    roomNameError.textContent = data.message || 'เกิดข้อผิดพลาดในการสร้างห้อง';
+                }
+            } catch (error) {
+                console.error('Error creating room:', error);
+                roomNameError.textContent = 'Network error or server unavailable.';
+            }
+        }
+
+        // Listen for room status updates from the server
+        socket.on('roomStatusUpdate', (roomData) => {
+            if (roomData.code === currentRoomCode) { // Ensure update is for current room
+                updateRoomStatus(roomData); // Use the data from the server
+            }
+        });
+
+        function updateRoomStatus(roomData) { // Now accepts roomData as argument
+            const playerListElem = document.getElementById('playerList');
+            const gameStatusElem = document.getElementById('gameStatus');
+            playerListElem.innerHTML = '';
+
+            if (!roomData) {
+                gameStatusElem.textContent = 'ไม่พบข้อมูลห้อง';
+                return;
+            }
+
+            // Ensure the creator player is in the list
+            if (!roomData.players['Creator']) {
+                // This shouldn't happen if joinRoomSocket works, but as a safeguard
+                roomData.players['Creator'] = { name: 'Creator', buzzedTime: null, isFoul: false, isWaiting: true };
+            }
+
+            const players = roomData.players;
+            let foulPlayers = [];
+            let waitingPlayers = [];
+            let buzzedPlayersInRound = [];
+
+            for (const playerName in players) {
+                const player = players[playerName];
+                // Check if the player is connected (socketId is not null)
+                const isConnected = !!player.socketId; 
+                let statusText = '';
+                let statusClass = '';
+
+                if (player.isFoul && !roomData.gameStarted) {
+                    statusText = 'FOUL! (กดก่อนเริ่ม)';
+                    statusClass = 'foul';
+                } else if (!player.buzzedTime && !player.isFoul && roomData.gameStarted) {
+                    statusText = 'รอ BUZZ...';
+                    statusClass = 'waiting';
+                } else if (player.buzzedTime && roomData.gameStarted && !player.isFoul) {
+                    const timeDiff = (player.buzzedTime - roomData.gameStartTime) / 1000;
+                    statusText = `กดใน ${timeDiff.toFixed(2)} วินาที`;
+                    statusClass = 'buzzed';
+                    if (roomData.firstBuzzer === playerName) {
+                        statusClass = 'buzzed-first';
+                        statusText = `กดคนแรก! (${timeDiff.toFixed(2)} วินาที)`;
+                    }
+                } else if (player.isFoul && roomData.gameStarted) {
+                    statusText = 'FOUL! (กดก่อนเริ่ม)'; // Foul players remain foul for the round
+                    statusClass = 'foul';
+                } else if (!player.buzzedTime && !player.isFoul && !roomData.gameStarted) {
+                    statusText = 'รอเล่น...';
+                    statusClass = 'waiting';
+                }
+                
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="player-name ${roomData.firstBuzzer === playerName ? 'first-buzzer' : ''}">
+                        ${playerName} ${!isConnected ? '(Offline)' : ''}
+                    </span>
+                    <span class="status ${statusClass}">${statusText}</span>
+                `;
+                playerListElem.appendChild(li);
+            }
+            
+            if (roomData.gameStarted) {
+                document.getElementById('startGameButton').style.display = 'none';
+                document.getElementById('resetGameButton').style.display = 'inline-block';
+                document.getElementById('clearResultsButton').style.display = 'inline-block';
+                if (roomData.firstBuzzer) {
+                    gameStatusElem.textContent = `ผู้กดคนแรก: ${roomData.firstBuzzer}`;
+                } else {
+                    gameStatusElem.textContent = 'เกมกำลังดำเนินอยู่...';
+                }
+            } else {
+                document.getElementById('startGameButton').style.display = 'inline-block';
+                document.getElementById('resetGameButton').style.display = 'none';
+                document.getElementById('clearResultsButton').style.display = 'none';
+                gameStatusElem.textContent = 'รอผู้สร้างกด "เริ่มเกม"';
+            }
+        }
+
+        function startGame() {
+            socket.emit('startGame', { roomCode: currentRoomCode });
+            console.log('เกมเริ่มต้นแล้ว!');
+        }
+
+        function resetGame() {
+            socket.emit('resetGame', { roomCode: currentRoomCode });
+            console.log('เกมถูกรีเซ็ตแล้ว!');
+        }
+
+        function clearResults() {
+            socket.emit('clearResults', { roomCode: currentRoomCode });
+            console.log('เคลียร์ผลลัพธ์แล้ว!');
+        }
+    </script>
+</body>
+</html>

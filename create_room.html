@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สร้างห้อง</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container create-room-container">
+        <h1>สร้างห้อง</h1>
+        <div id="setupSection">
+            <p class="room-code-display">รหัสห้อง: <span id="roomCodeDisplay"></span></p>
+            <div class="input-group">
+                <label for="roomName">ชื่อห้อง:</label>
+                <input type="text" id="roomName" placeholder="ใส่ชื่อห้องของคุณ">
+            </div>
+            <button class="primary-button" onclick="saveRoomDetails()">บันทึกและสร้างห้อง</button>
+            <p id="roomNameError" class="error-message"></p>
+        </div>
+
+        <div id="roomDetails" style="display: none;">
+            <h2>ห้องของคุณ</h2>
+            <p class="room-code-info">รหัสห้อง: <strong id="displayRoomCode"></strong></p>
+            <p class="room-name-info">ชื่อห้อง: <strong id="displayRoomName"></strong></p>
+
+            <h3>ผู้เข้าร่วม:</h3>
+            <ul id="playerList" class="player-list">
+                <!-- ผู้เล่นจะแสดงที่นี่ -->
+            </ul>
+            <p id="gameStatus" class="game-status"></p>
+
+            <div class="button-group-actions">
+                <button id="startGameButton" class="action-button" onclick="startGame()">เริ่มเกม</button>
+                <button id="resetGameButton" class="action-button secondary" onclick="resetGame()" style="display: none;">รีเซ็ตเกม</button>
+                <button id="clearResultsButton" class="action-button danger" onclick="clearResults()" style="display: none;">เคลียร์ผลลัพธ์</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentRoomCode;
+        let updateInterval; // เก็บ reference ของ setInterval เพื่อเคลียร์ได้
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // ล้างข้อมูลห้องเก่าทั้งหมดเมื่อเข้าสู่หน้านี้
+            localStorage.removeItem('gameRoom'); 
+            localStorage.removeItem('currentPlayerName');
+            localStorage.removeItem('currentPlayerRoomCode');
+
+            currentRoomCode = generateRoomCode();
+            document.getElementById('roomCodeDisplay').textContent = currentRoomCode;
+        });
+
+        // Function เพื่อตรวจสอบอักขระพิเศษ
+        function isValidName(name) {
+            // อนุญาตตัวอักษรไทย, อังกฤษ (ทั้งเล็กและใหญ่), ตัวเลข, และเว้นวรรค
+            const regex = /^[ก-๙a-zA-Z0-9\s]+$/;
+            return regex.test(name);
+        }
+
+        function generateRoomCode() {
+            return Math.floor(1000 + Math.random() * 9000); // 4 หลัก
+        }
+
+        function saveRoomDetails() {
+            const roomNameInput = document.getElementById('roomName');
+            const roomName = roomNameInput.value.trim(); // .trim() ลบช่องว่างหน้าหลัง
+            const roomNameError = document.getElementById('roomNameError');
+
+            if (!roomName) {
+                roomNameError.textContent = 'กรุณาใส่ชื่อห้อง';
+                return;
+            }
+            if (!isValidName(roomName)) {
+                roomNameError.textContent = 'ชื่อห้องห้ามมีอักขระพิเศษ (อนุญาตเฉพาะตัวอักษรไทย, อังกฤษ, ตัวเลข, เว้นวรรค)';
+                return;
+            }
+            roomNameError.textContent = ''; // เคลียร์ error ถ้ามี
+
+            const roomData = {
+                code: currentRoomCode,
+                name: roomName,
+                players: {},
+                gameStarted: false,
+                gameStartTime: null,
+                buzzedOrder: [],
+                firstBuzzer: null,
+                isCreator: true
+            };
+            localStorage.setItem('gameRoom', JSON.stringify(roomData));
+
+            document.getElementById('displayRoomCode').textContent = currentRoomCode;
+            document.getElementById('displayRoomName').textContent = roomName;
+            document.getElementById('setupSection').style.display = 'none';
+            document.getElementById('roomDetails').style.display = 'block';
+
+            // เริ่มอัปเดตผู้เล่น
+            if (updateInterval) clearInterval(updateInterval); // เคลียร์ interval เก่าถ้ามี
+            updateInterval = setInterval(updateRoomStatus, 500);
+        }
+
+        function updateRoomStatus() {
+            const roomData = JSON.parse(localStorage.getItem('gameRoom'));
+            const playerListElem = document.getElementById('playerList');
+            const gameStatusElem = document.getElementById('gameStatus');
+            playerListElem.innerHTML = '';
+
+            if (!roomData) {
+                gameStatusElem.textContent = 'ไม่พบข้อมูลห้อง';
+                // อาจจะ redirect กลับหน้าสร้างห้องถ้าไม่มีข้อมูล
+                // window.location.href = 'create_room.html';
+                return;
+            }
+
+            const players = roomData.players;
+            let foulPlayers = [];
+            let waitingPlayers = [];
+            let buzzedPlayersInRound = [];
+
+            for (const playerName in players) {
+                const player = players[playerName];
+                if (player.isFoul && !roomData.gameStarted) {
+                    foulPlayers.push({ name: playerName, time: player.buzzedTime });
+                } else if (!player.buzzedTime && !player.isFoul) {
+                    waitingPlayers.push({ name: playerName });
+                } else if (player.buzzedTime && roomData.gameStarted && !player.isFoul) {
+                    const timeDiff = (player.buzzedTime - roomData.gameStartTime) / 1000;
+                    buzzedPlayersInRound.push({ name: playerName, time: timeDiff });
+                } else if (player.isFoul && roomData.gameStarted) {
+                    foulPlayers.push({ name: playerName, time: player.buzzedTime });
+                } else if (!player.buzzedTime && roomData.gameStarted) {
+                    waitingPlayers.push({ name: playerName });
+                }
+            }
+            
+            foulPlayers.sort((a, b) => a.time - b.time);
+            buzzedPlayersInRound.sort((a, b) => a.time - b.time);
+
+            foulPlayers.forEach(player => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="player-name">${player.name}</span> <span class="status foul">FOUL! (กดก่อนเริ่ม)</span>`;
+                playerListElem.appendChild(li);
+            });
+
+            waitingPlayers.forEach(player => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="player-name">${player.name}</span> <span class="status waiting">รอเล่น...</span>`;
+                playerListElem.appendChild(li);
+            });
+
+            buzzedPlayersInRound.forEach(player => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="player-name">${player.name}</span> <span class="status buzzed">กดใน ${player.time.toFixed(2)} วินาที</span>`;
+                if (roomData.firstBuzzer === player.name) {
+                     li.innerHTML = `<span class="player-name first-buzzer">${player.name}</span> <span class="status buzzed-first">กดคนแรก! (${player.time.toFixed(2)} วินาที)</span>`;
+                }
+                playerListElem.appendChild(li);
+            });
+
+            if (roomData.gameStarted) {
+                document.getElementById('startGameButton').style.display = 'none';
+                document.getElementById('resetGameButton').style.display = 'inline-block';
+                document.getElementById('clearResultsButton').style.display = 'inline-block';
+                if (roomData.firstBuzzer) {
+                    gameStatusElem.textContent = `ผู้กดคนแรก: ${roomData.firstBuzzer}`;
+                } else {
+                    gameStatusElem.textContent = 'เกมกำลังดำเนินอยู่...';
+                }
+            } else {
+                document.getElementById('startGameButton').style.display = 'inline-block';
+                document.getElementById('resetGameButton').style.display = 'none';
+                document.getElementById('clearResultsButton').style.display = 'none';
+                gameStatusElem.textContent = 'รอผู้สร้างกด "เริ่มเกม"';
+            }
+        }
+
+        function startGame() {
+            let roomData = JSON.parse(localStorage.getItem('gameRoom'));
+            if (roomData) {
+                roomData.gameStarted = true;
+                roomData.gameStartTime = Date.now();
+                roomData.firstBuzzer = null;
+                roomData.buzzedOrder = [];
+
+                for (const playerName in roomData.players) {
+                    if (!roomData.players[playerName].isFoul) {
+                        roomData.players[playerName].buzzedTime = null;
+                        roomData.players[playerName].isWaiting = true;
+                    } else {
+                        roomData.players[playerName].isWaiting = false;
+                    }
+                }
+                localStorage.setItem('gameRoom', JSON.stringify(roomData));
+                console.log('เกมเริ่มต้นแล้ว!');
+                updateRoomStatus();
+            }
+        }
+
+        function resetGame() {
+            let roomData = JSON.parse(localStorage.getItem('gameRoom'));
+            if (roomData) {
+                roomData.gameStarted = false;
+                roomData.gameStartTime = null;
+                roomData.firstBuzzer = null;
+                roomData.buzzedOrder = [];
+
+                for (const playerName in roomData.players) {
+                    roomData.players[playerName].buzzedTime = null;
+                    roomData.players[playerName].isFoul = false;
+                    roomData.players[playerName].isWaiting = true;
+                }
+                localStorage.setItem('gameRoom', JSON.stringify(roomData));
+                console.log('เกมถูกรีเซ็ตแล้ว!');
+                updateRoomStatus();
+            }
+        }
+
+        function clearResults() {
+             let roomData = JSON.parse(localStorage.getItem('gameRoom'));
+            if (roomData) {
+                roomData.firstBuzzer = null;
+                roomData.buzzedOrder = [];
+                for (const playerName in roomData.players) {
+                    if (!roomData.players[playerName].isFoul) {
+                        roomData.players[playerName].buzzedTime = null;
+                    }
+                }
+                localStorage.setItem('gameRoom', JSON.stringify(roomData));
+                updateRoomStatus();
+            }
+        }
+    </script>
+</body>
+</html>
